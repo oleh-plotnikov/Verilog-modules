@@ -2,8 +2,8 @@
 
 
 module i2c_cmps (
-					input  wire	       clk,
-					input  wire	       i_reset_n,
+					input  wire	   clk,
+					input  wire	   i_reset_n,
 					input  wire        start,
 					input  wire  [7:0] i_data,
 					
@@ -11,8 +11,8 @@ module i2c_cmps (
 					output reg   [7:0] o_data,
 					output wire        o_data_ready,
 					output wire        ready,  
-					inout  wire	       io_sda,
-					inout  wire	       io_scl
+					inout  wire	   io_sda,
+					inout  wire	   io_scl
                 );
 
 parameter DELAY = 1000;
@@ -21,7 +21,7 @@ localparam  STATE_IDLE  =   0,
             STATE_START =   1,
             STATE_WRITE =   2,
             STATE_WACK  =   3,
-	        STATE_READ  =   4,
+	    STATE_READ  =   4,
             STATE_WACK2 =   5,
             STATE_STOP  =   6;
             
@@ -31,22 +31,21 @@ reg [7:0] count;
 reg       i2c_scl_enable;
 reg       rw_r;
 reg       error_r;
-
 reg [7:0] saved_i_data;
 
-reg sda_ctrl;
-wire scl_ctrl;
-
+reg       sda_ctrl;
+wire      scl_ctrl;
+	
 wire i2c_clk;
 wire sda_in;
 
 i2c_clk_divider #(.DELAY(DELAY)) i2c_clk_divider_inst  (
     
-                                            .i_reset_n(i_reset_n),
-                                            .ref_clk(clk),
-                                            .i2c_clk(i2c_clk)
+        		                                    .i_reset_n(i_reset_n),
+                       			                    .ref_clk(clk),
+                                       			    .i2c_clk(i2c_clk)
                                             
-                                        );
+                                        		);
 
 assign io_sda = sda_ctrl ? 1'bz : 1'b0;
 assign sda_in = io_sda;
@@ -79,58 +78,53 @@ always @(posedge i2c_clk, negedge i_reset_n) begin
         state <= STATE_IDLE;
         sda_ctrl <= 1;
         count <= 8'd0;
-	    saved_i_data <= 8'b0;
+	saved_i_data <= 8'b0;
         o_data       <= 8'b0;
-	    rw_r         <= 0;
-	    error_r      <= 0;
+	rw_r         <= 0;
+	error_r      <= 0;
 
-    end
-    else begin
-        case (state)
+    end else begin
+       
+	    case (state)
             
 STATE_IDLE: //0
             
                 begin // idle state
-                
                     sda_ctrl <= 1;
-                        
                         if (start) begin
-                            
+				
                             state <= STATE_START;
                             saved_i_data <= i_data;
                             rw_r <= i_data[0];
                             count <= 7;
-
-                        end else 
-       
+                        
+			end else
                         state   <= STATE_IDLE;
-                end // end idle state
-        
+            	end // end idle state
 
-
+		    
 STATE_START: //1
-                begin // rw state
+                
+		begin // start state
                     
                     sda_ctrl <= 0;
                     count <= 7;
                     state <= STATE_WRITE;
                 
-                end
-                
-
-                
+                end // end start state
+              
+		    
 STATE_WRITE: //2
                 
                 begin // data state
     
-                          sda_ctrl <= saved_i_data[count];
-                          if (count == 0) begin
-                          state <= STATE_WACK;
-                          end else count <= count - 1;               
+                     sda_ctrl <= saved_i_data[count];
+                     if (count == 0) begin
+                     state <= STATE_WACK;
+                     end else count <= count - 1;               
       
                 end // end data state
                 
-        
 STATE_WACK: //3
                 begin // wack states
                 
@@ -146,61 +140,61 @@ STATE_WACK: //3
                                               
                         error_r <= 1'b0;
                         
-                        if(rw_r) begin
+                    if(rw_r) begin
                             
                             state <= STATE_READ;
                             count <= 8;
                                                         
-                        end else 
-                        
-                        if (start) begin
+                    end else if (start) begin
                             
                             saved_i_data <= i_data;                            
                             state <= STATE_WRITE;
                             count <= 7;
                                                                                     
-                        end else 
+                       	end else 
                                                                                         
                             state <= STATE_STOP;                        
                     
-                end
+		end // end wack state
 
-
-
-
+		    
 STATE_READ: //4
-            if (count == 8) begin
+	    	if (count == 8) begin // read_data state
             
-                sda_ctrl <= 1;
-                count <= count - 1;
-                state <= STATE_READ;
+           	     sda_ctrl <= 1;
+      		     count <= count - 1;
+                     state <= STATE_READ;
                 
-            end else begin // read_data state
+                end else begin 
                 
-                sda_ctrl <= 1;
-                o_data[count] <= io_sda;
+                     sda_ctrl <= 1;
+                     o_data[count] <= io_sda;
                
                 if (count == 0) begin
                     
                     sda_ctrl <= 1'b0;
                 
                 if (start)
-                    state <= STATE_WACK2;
-                else begin
-                    sda_ctrl <= 1'b1;
+                
+		    state <= STATE_WACK2;
+                
+		else begin
+                
+		    sda_ctrl <= 1'b1;
                     state <= STATE_STOP;
-                end end else begin
+                
+		end end else begin
                 
                     count <= count - 1;               
-                                                              // write STATE_READ
+                    
                 end
             end // end read_data state
 
 
-
-STATE_WACK2: begin// 5
+STATE_WACK2: // 5
+	    begin // wack2 state
                  
-                 if (start) begin
+		if (start) begin 
                  
                     sda_ctrl <= 1'b1;
                     state <= STATE_READ;
@@ -211,20 +205,21 @@ STATE_WACK2: begin// 5
                     sda_ctrl <= 1'b1;
                     state <= STATE_STOP;
                  
-                 end // end wack2 state
+                 end 
               
-              end
-STATE_STOP: begin //6
+            end // end wack2 state
+		    
+		    
+STATE_STOP: //6
+	    begin //stop state
 
                   sda_ctrl <= 0;
                   state <= STATE_IDLE;
 
-             end // end stop state
+            end // end stop state
                    
-       endcase     
+       	endcase     
    end
-   
 end
-
 
 endmodule
