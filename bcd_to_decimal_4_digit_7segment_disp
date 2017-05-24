@@ -1,0 +1,119 @@
+module bcd_to_decimal(
+                        input [31:0] binary,
+                        output reg [3:0] thousands,
+                        output reg [3:0] hundreds,
+                        output reg [3:0] tens,
+                        output reg [3:0] ones
+                      );
+integer i;         
+                        
+always @* begin
+    // reset 1000's, 100's, 10's, 1's
+    thousands = 4'b0;
+    hundreds  = 4'b0;
+    tens      = 4'b0;
+    ones      = 4'b0;
+ 
+if (binary < 16'h2710)
+    for (i = 15; i >=0; i = i -1) begin
+        if (thousands >= 5)
+                thousands = thousands + 3;
+        if (hundreds >= 5)
+                hundreds = hundreds + 3;
+        if (tens >= 5)
+                tens = tens + 3;                            
+        if (ones >= 5)
+                ones = ones + 3;
+        
+        // shift left one 
+        thousands = thousands << 1;
+        thousands[0] = hundreds[3];
+        hundreds = hundreds << 1;
+        hundreds[0] = tens[3];
+        tens = tens << 1;
+        tens[0] = ones[3];
+        ones = ones << 1;
+        ones[0] = binary[i];
+    end                                      
+else begin
+        thousands = 9;
+        hundreds  = 9;
+        tens      = 9;
+        ones      = 9;
+end
+end
+
+endmodule
+
+//--------------------------------------------------------------------
+
+module mfp_multi_digit_display
+(
+    input             clock,
+    input             resetn,
+    input      [31:0] number,
+
+    output reg [ 6:0] seven_segments,
+    output reg        dot,
+    output reg [ 7:0] anodes
+);
+
+wire [15:0] dec_number;
+wire [3:0] thousands, hundreds, tens, ones;
+
+bcd_to_decimal bcd_to_decimal_inst(
+                                    .binary(number),
+                                    .thousands(thousands),
+                                    .hundreds(hundreds),
+                                    .tens(tens),
+                                    .ones(ones)
+                                  );
+
+assign dec_number = {thousands, hundreds, tens, ones};
+
+    function [6:0] bcd_to_seg (input [3:0] bcd);
+
+        case (bcd)
+        'h0: bcd_to_seg = 'b1000000;  // a b c d e f g
+        'h1: bcd_to_seg = 'b1111001;
+        'h2: bcd_to_seg = 'b0100100;  //   --a--
+        'h3: bcd_to_seg = 'b0110000;  //  |     |
+        'h4: bcd_to_seg = 'b0011001;  //  f     b
+        'h5: bcd_to_seg = 'b0010010;  //  |     |
+        'h6: bcd_to_seg = 'b0000010;  //   --g--
+        'h7: bcd_to_seg = 'b1111000;  //  |     |
+        'h8: bcd_to_seg = 'b0000000;  //  e     c
+        'h9: bcd_to_seg = 'b0010000;  //  |     |
+        'ha: bcd_to_seg = 'b0001000;  //   --d-- 
+        'hb: bcd_to_seg = 'b0000011;
+        'hc: bcd_to_seg = 'b1000110;
+        'hd: bcd_to_seg = 'b0100001;
+        'he: bcd_to_seg = 'b0000110;
+        'hf: bcd_to_seg = 'b0001110;
+        endcase
+
+    endfunction
+
+    reg [2:0] i;
+
+    always @ (posedge clock or negedge resetn)
+    begin
+        if (! resetn)
+        begin
+            seven_segments <=   bcd_to_seg (0);
+            dot            <= 0;
+            anodes         <= 8'b00000001;
+
+            i <= 0;
+        end
+        else
+        begin
+            seven_segments <=  bcd_to_seg (dec_number [i * 4 +: 4]);
+            dot            <= 0;
+            anodes         <= (1 << i);
+
+            i <= i + 1;
+        end
+    end
+
+endmodule
